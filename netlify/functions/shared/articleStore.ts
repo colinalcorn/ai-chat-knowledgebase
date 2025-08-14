@@ -91,7 +91,7 @@ async function createDemoChunks(): Promise<void> {
         articleId: 'demo_android',
         articleName: 'Testing Your Android App',
         text: 'To test your Android app effectively, start by using Android Studio\'s built-in testing tools. For unit testing, use JUnit to test individual components and business logic. For UI testing, implement Espresso tests to verify user interactions and interface behavior. Always test on both Android emulators and physical devices to ensure broad compatibility across different Android versions, screen sizes, and device configurations. Consider using Firebase Test Lab for comprehensive device testing. Set up continuous integration to run tests automatically on each code commit.',
-        url: 'https://support.aloompa.com/collection/24-festapp-cms',
+        url: 'https://support.aloompa.com/article/402-testing-your-android-app',
         lastModified: new Date().toISOString(),
         chunkIndex: 0,
       },
@@ -100,7 +100,7 @@ async function createDemoChunks(): Promise<void> {
         articleId: 'demo_ios',
         articleName: 'Testing Your iOS App',
         text: 'For comprehensive iOS app testing, utilize Xcode\'s integrated testing framework. Use XCTest for unit testing to verify individual functions and classes work correctly. Implement UI tests using XCUITest to automate user interface interactions and validate app flows. Test on both iOS Simulator and physical devices to ensure compatibility across different iOS versions and device types (iPhone, iPad). Use TestFlight for beta testing with external users before App Store submission. Configure code coverage reports to ensure adequate test coverage of your codebase.',
-        url: 'https://support.aloompa.com/collection/24-festapp-cms',
+        url: 'https://support.aloompa.com/article/403-testing-your-ios-app',
         lastModified: new Date().toISOString(),
         chunkIndex: 0,
       },
@@ -109,7 +109,7 @@ async function createDemoChunks(): Promise<void> {
         articleId: 'demo_push',
         articleName: 'Push Notifications Setup Guide',
         text: 'Push notifications enable real-time communication with your app users. To implement push notifications: 1) Configure Firebase Cloud Messaging (FCM) for Android and Apple Push Notification service (APNs) for iOS. 2) Set up your server backend to send notifications using the appropriate APIs. 3) Implement notification handling in your app code to receive and display messages. 4) Test notifications thoroughly on both platforms and different device states (foreground, background, terminated). 5) Consider notification categories, rich media attachments, and deep linking for enhanced user experience.',
-        url: 'https://support.aloompa.com/collection/24-festapp-cms',
+        url: 'https://support.aloompa.com/article/404-push-notifications',
         lastModified: new Date().toISOString(),
         chunkIndex: 0,
       }
@@ -118,12 +118,16 @@ async function createDemoChunks(): Promise<void> {
     // Generate embeddings for demo chunks
     for (const chunk of demoChunks) {
       try {
+        console.log(`🔄 Generating embedding for: ${chunk.articleName}`);
         const embedding = await generateEmbedding(chunk.text);
         chunk.embedding = embedding;
         articleChunks.push(chunk);
-        console.log(`✅ Created demo chunk: ${chunk.articleName}`);
+        console.log(`✅ Created demo chunk: ${chunk.articleName} (embedding length: ${embedding.length})`);
       } catch (error) {
         console.error(`❌ Failed to create embedding for demo chunk ${chunk.id}:`, error);
+        // Add chunk without embedding as fallback
+        articleChunks.push(chunk);
+        console.log(`⚠️ Added demo chunk without embedding: ${chunk.articleName}`);
       }
     }
     
@@ -307,21 +311,58 @@ export async function searchArticles(query: string, limit: number = 5): Promise<
   }
   
   try {
-    const queryEmbedding = await generateEmbedding(query);
+    // Try semantic search with embeddings first
+    const chunksWithEmbeddings = articleChunks.filter(chunk => chunk.embedding);
     
-    const similarities = articleChunks
-      .filter(chunk => chunk.embedding)
-      .map(chunk => ({
-        chunk,
-        similarity: cosineSimilarity(queryEmbedding, chunk.embedding!),
-      }))
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
-    
-    return similarities.map(item => item.chunk);
+    if (chunksWithEmbeddings.length > 0) {
+      console.log(`🔍 Using semantic search with ${chunksWithEmbeddings.length} chunks with embeddings`);
+      const queryEmbedding = await generateEmbedding(query);
+      
+      const similarities = chunksWithEmbeddings
+        .map(chunk => ({
+          chunk,
+          similarity: cosineSimilarity(queryEmbedding, chunk.embedding!),
+        }))
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, limit);
+      
+      console.log(`🎯 Semantic search found ${similarities.length} results`);
+      return similarities.map(item => item.chunk);
+    } else {
+      // Fallback to keyword search if no embeddings available
+      console.log(`🔍 Using keyword search fallback with ${articleChunks.length} chunks`);
+      const keywordResults = articleChunks
+        .map(chunk => {
+          const queryLower = query.toLowerCase();
+          const textLower = chunk.text.toLowerCase();
+          const titleLower = chunk.articleName.toLowerCase();
+          
+          let score = 0;
+          if (titleLower.includes(queryLower)) score += 10;
+          if (textLower.includes(queryLower)) score += 5;
+          
+          // Check for individual query words
+          const queryWords = queryLower.split(/\s+/);
+          queryWords.forEach(word => {
+            if (titleLower.includes(word)) score += 3;
+            if (textLower.includes(word)) score += 1;
+          });
+          
+          return { chunk, score };
+        })
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+      
+      console.log(`🎯 Keyword search found ${keywordResults.length} results`);
+      return keywordResults.map(item => item.chunk);
+    }
   } catch (error) {
     console.error('Error searching articles:', error);
-    return [];
+    
+    // Final fallback - return all chunks if search fails
+    console.log(`🆘 Search failed, returning all ${articleChunks.length} chunks as fallback`);
+    return articleChunks.slice(0, limit);
   }
 }
 
