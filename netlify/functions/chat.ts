@@ -85,21 +85,27 @@ I can still try to help with general questions about your platform or documentat
     
     if (relevantChunks.length > 0) {
       console.log(`- Sample chunk: "${relevantChunks[0].text.substring(0, 150)}..."`);
+      console.log(`- Chunk article: "${relevantChunks[0].articleName}"`);
     }
     
-    console.log(`- Context preview: "${context.substring(0, 200)}..."`);
+    console.log(`- Context preview: "${context.substring(0, 300)}..."`);
+    console.log(`- Full context being sent to OpenAI: "${context}"`);
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
         {
           role: 'system',
-          content: `You are a helpful AI assistant for a knowledge base chat system. 
-          You help users find information from HelpScout documentation and provide helpful, accurate responses.
-          When you have relevant documentation, use it to answer questions accurately.
-          If the documentation doesn't contain the answer, say so honestly.
-          Keep your responses concise but informative.
-          Always cite which articles you're referencing when possible.`,
+          content: `You are a helpful AI assistant for a knowledge base chat system.
+          
+          CRITICAL: When provided with documentation in the user message, you MUST use that documentation as the primary source for your response. Do not provide generic answers when specific documentation is available.
+          
+          Instructions:
+          1. If documentation is provided in the user message, base your answer ENTIRELY on that documentation
+          2. Quote specific details from the provided documentation
+          3. Always cite which articles you're referencing
+          4. Only provide generic advice if no relevant documentation is provided
+          5. Keep responses concise but informative`,
         },
         {
           role: 'user',
