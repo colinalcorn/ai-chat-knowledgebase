@@ -177,3 +177,44 @@
     opacity: 1;
   }
 }
+
+.message-sources {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+  font-size: 12px;
+}
+
+.message-sources strong {
+  color: #495057;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.message-sources ul {
+  margin: 0;
+  padding-left: 16px;
+  list-style-type: disc;
+}
+
+.message-sources ul li {
+  margin-bottom: 2px;
+}
+
+.message-sources a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.message-sources a:hover {
+  text-decoration: underline;
+}
+
+.chunks-info {
+  margin-top: 5px;
+  font-style: italic;
+  color: #6c757d;
+  font-size: 11px;
+}

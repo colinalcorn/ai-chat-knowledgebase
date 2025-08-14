@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import './App.css';
 
+interface Source {
+  name: string;
+  url: string;
+}
+
 interface Message {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
+  sources?: Source[];
+  relevantChunks?: number;
 }
 
 function App() {
@@ -16,7 +23,7 @@ function App() {
   const testKnowledgeBase = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/ingest', {
+      const response = await fetch('/api/ingest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -27,7 +34,7 @@ function App() {
       
       const testMessage: Message = {
         id: Date.now().toString(),
-        text: `✅ Knowledge Base Connected!\n\nFound ${data.collections} collections with ${data.docsProcessed} items:\n${data.preview.map((item: any) => `• ${item.name}`).join('\n')}\n\nYour chat can now access HelpScout documentation!`,
+        text: `✅ Knowledge Base Connected!\n\nFound ${data.collections} collections with ${data.docsProcessed} articles processed.\nStorage Stats: ${data.storageStats.totalChunks} chunks created, ${data.storageStats.chunksWithEmbeddings} with embeddings.\n\nPreview of articles:\n${data.preview.map((item: any) => `• ${item.name} (${item.textLength} chars)`).join('\n')}\n\nYour chat can now access HelpScout documentation!`,
         isUser: false,
         timestamp: new Date(),
       };
@@ -61,7 +68,7 @@ function App() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,6 +83,8 @@ function App() {
         text: data.answer || 'Sorry, I encountered an error.',
         isUser: false,
         timestamp: new Date(),
+        sources: data.sources || [],
+        relevantChunks: data.relevantChunks || 0,
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -124,6 +133,25 @@ function App() {
               <div className="message-content">
                 {message.text}
               </div>
+              {message.sources && message.sources.length > 0 && (
+                <div className="message-sources">
+                  <strong>Sources:</strong>
+                  <ul>
+                    {message.sources.map((source, index) => (
+                      <li key={index}>
+                        <a href={source.url} target="_blank" rel="noopener noreferrer">
+                          {source.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                  {message.relevantChunks && (
+                    <div className="chunks-info">
+                      Found {message.relevantChunks} relevant article sections
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="message-timestamp">
                 {message.timestamp.toLocaleTimeString()}
               </div>
