@@ -33,23 +33,103 @@ const STORAGE_FILE = '/tmp/article_chunks.json';
 // Load chunks from file if available
 function loadChunksFromFile(): void {
   try {
+    console.log(`🔍 Attempting to load chunks from: ${STORAGE_FILE}`);
+    
     if (fs.existsSync(STORAGE_FILE)) {
       const data = fs.readFileSync(STORAGE_FILE, 'utf8');
-      articleChunks = JSON.parse(data);
-      console.log(`Loaded ${articleChunks.length} chunks from persistent storage`);
+      const loadedChunks = JSON.parse(data);
+      
+      // Validate the loaded data
+      if (Array.isArray(loadedChunks) && loadedChunks.length > 0) {
+        articleChunks = loadedChunks;
+        console.log(`✅ Loaded ${articleChunks.length} chunks from persistent storage`);
+      } else {
+        console.log(`❌ Invalid chunk data in storage file`);
+      }
+    } else {
+      console.log(`❌ Storage file does not exist: ${STORAGE_FILE}`);
+      
+      // Check if we can write to tmp directory
+      try {
+        fs.writeFileSync('/tmp/test-write.txt', 'test');
+        fs.unlinkSync('/tmp/test-write.txt');
+        console.log(`✅ /tmp directory is writable`);
+      } catch (writeError) {
+        console.log(`❌ /tmp directory not writable:`, writeError);
+      }
     }
   } catch (error) {
-    console.error('Error loading chunks from file:', error);
+    console.error('❌ Error loading chunks from file:', error);
   }
 }
 
 // Save chunks to file
 function saveChunksToFile(): void {
   try {
-    fs.writeFileSync(STORAGE_FILE, JSON.stringify(articleChunks, null, 2));
-    console.log(`Saved ${articleChunks.length} chunks to persistent storage`);
+    const dataToSave = JSON.stringify(articleChunks, null, 2);
+    fs.writeFileSync(STORAGE_FILE, dataToSave);
+    console.log(`✅ Saved ${articleChunks.length} chunks to persistent storage (${dataToSave.length} bytes)`);
+    
+    // Verify the file was written correctly
+    if (fs.existsSync(STORAGE_FILE)) {
+      const fileSize = fs.statSync(STORAGE_FILE).size;
+      console.log(`✅ Confirmed storage file exists: ${fileSize} bytes`);
+    }
   } catch (error) {
-    console.error('Error saving chunks to file:', error);
+    console.error('❌ Error saving chunks to file:', error);
+  }
+}
+
+// Create demo chunks for production testing
+async function createDemoChunks(): Promise<void> {
+  try {
+    console.log('🎯 Creating demo chunks for production testing...');
+    
+    const demoChunks: ArticleChunk[] = [
+      {
+        id: 'demo_android_chunk_0',
+        articleId: 'demo_android',
+        articleName: 'Testing Your Android App',
+        text: 'To test your Android app, you can use various testing frameworks and tools. The most common approach is to use Android Studio\'s built-in testing features, including unit testing with JUnit and UI testing with Espresso. You can also test on emulators or physical devices to ensure compatibility across different Android versions and device configurations.',
+        url: 'https://support.aloompa.com/article/demo-android-testing',
+        lastModified: new Date().toISOString(),
+        chunkIndex: 0,
+      },
+      {
+        id: 'demo_ios_chunk_0',
+        articleId: 'demo_ios',
+        articleName: 'Testing Your iOS App',
+        text: 'For iOS app testing, Xcode provides comprehensive testing tools including XCTest for unit testing and UI testing. You can run tests on the iOS Simulator or on physical devices. Consider testing on multiple iOS versions and device types to ensure broad compatibility. TestFlight is also useful for beta testing with external users.',
+        url: 'https://support.aloompa.com/article/demo-ios-testing',
+        lastModified: new Date().toISOString(),
+        chunkIndex: 0,
+      },
+      {
+        id: 'demo_push_chunk_0',
+        articleId: 'demo_push',
+        articleName: 'Push Notifications',
+        text: 'Push notifications are messages sent from your app server to users\' devices. To implement push notifications, you need to configure your app with the appropriate push notification service (FCM for Android, APNs for iOS), set up your server to send notifications, and handle notification receipt in your app code.',
+        url: 'https://support.aloompa.com/article/demo-push-notifications',
+        lastModified: new Date().toISOString(),
+        chunkIndex: 0,
+      }
+    ];
+    
+    // Generate embeddings for demo chunks
+    for (const chunk of demoChunks) {
+      try {
+        const embedding = await generateEmbedding(chunk.text);
+        chunk.embedding = embedding;
+        articleChunks.push(chunk);
+        console.log(`✅ Created demo chunk: ${chunk.articleName}`);
+      } catch (error) {
+        console.error(`❌ Failed to create embedding for demo chunk ${chunk.id}:`, error);
+      }
+    }
+    
+    console.log(`🎯 Created ${articleChunks.length} demo chunks for production testing`);
+  } catch (error) {
+    console.error('❌ Error creating demo chunks:', error);
   }
 }
 
@@ -214,6 +294,12 @@ export async function searchArticles(query: string, limit: number = 5): Promise<
   }
   
   console.log(`Total chunks available: ${articleChunks.length}`);
+  
+  // If still no chunks after loading from file, create fallback demo chunks
+  if (articleChunks.length === 0) {
+    console.log('🚀 No chunks found, creating demo chunks for testing...');
+    createDemoChunks();
+  }
   
   if (articleChunks.length === 0) {
     console.log('No chunks available for search');
