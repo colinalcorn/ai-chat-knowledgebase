@@ -77,6 +77,18 @@ Note: This is a demo with limited article processing. In a full implementation, 
 I can still try to help with general questions about your platform or documentation structure. Please let me know if you'd like me to help with something else or if you can rephrase your question.`;
     }
 
+    // Debug logging for production
+    console.log(`📊 PRODUCTION DEBUG:`);
+    console.log(`- Context length: ${context.length} chars`);
+    console.log(`- Sources found: ${sources.length}`);
+    console.log(`- OpenAI API Key configured: ${!!process.env.OPENAI_API_KEY}`);
+    
+    if (relevantChunks.length > 0) {
+      console.log(`- Sample chunk: "${relevantChunks[0].text.substring(0, 150)}..."`);
+    }
+    
+    console.log(`- Context preview: "${context.substring(0, 200)}..."`);
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
