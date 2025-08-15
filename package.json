@@ -28,7 +28,8 @@
   "scripts": {
     "start": "react-scripts start",
     "dev": "netlify dev",
-    "build": "react-scripts build",
+    "build": "react-scripts build && npm run build:functions",
+    "build:functions": "tsc netlify/functions/**/*.ts --outDir netlify/functions --target es2020 --module commonjs --esModuleInterop --skipLibCheck",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
