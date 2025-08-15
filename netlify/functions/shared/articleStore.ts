@@ -24,59 +24,41 @@ export interface Article {
 let articleStore: Map<string, Article> = new Map();
 let articleChunks: ArticleChunk[] = [];
 
-// Simple file-based persistence for serverless demo
-import * as fs from 'fs';
-import * as path from 'path';
+// Netlify Blob Store for persistent storage
+import { getStore } from '@netlify/blobs';
 
-const STORAGE_FILE = '/tmp/article_chunks.json';
+const STORAGE_KEY = 'helpscout-articles';
 
-// Load chunks from file if available
-function loadChunksFromFile(): void {
+// Load chunks from blob store if available
+async function loadChunksFromStorage(): Promise<void> {
   try {
-    console.log(`🔍 Attempting to load chunks from: ${STORAGE_FILE}`);
+    console.log(`🔍 Attempting to load chunks from Netlify Blob Store...`);
     
-    if (fs.existsSync(STORAGE_FILE)) {
-      const data = fs.readFileSync(STORAGE_FILE, 'utf8');
-      const loadedChunks = JSON.parse(data);
-      
-      // Validate the loaded data
-      if (Array.isArray(loadedChunks) && loadedChunks.length > 0) {
-        articleChunks = loadedChunks;
-        console.log(`✅ Loaded ${articleChunks.length} chunks from persistent storage`);
-      } else {
-        console.log(`❌ Invalid chunk data in storage file`);
-      }
+    const store = getStore('helpscout');
+    const storedData = await store.get(STORAGE_KEY, { type: 'json' });
+    
+    if (storedData && Array.isArray(storedData) && storedData.length > 0) {
+      articleChunks = storedData;
+      console.log(`✅ Loaded ${articleChunks.length} chunks from Netlify Blob Store`);
     } else {
-      console.log(`❌ Storage file does not exist: ${STORAGE_FILE}`);
-      
-      // Check if we can write to tmp directory
-      try {
-        fs.writeFileSync('/tmp/test-write.txt', 'test');
-        fs.unlinkSync('/tmp/test-write.txt');
-        console.log(`✅ /tmp directory is writable`);
-      } catch (writeError) {
-        console.log(`❌ /tmp directory not writable:`, writeError);
-      }
+      console.log(`❌ No chunks found in Netlify Blob Store`);
     }
   } catch (error) {
-    console.error('❌ Error loading chunks from file:', error);
+    console.error('❌ Error loading chunks from Netlify Blob Store:', error);
   }
 }
 
-// Save chunks to file
-function saveChunksToFile(): void {
+// Save chunks to blob store
+async function saveChunksToStorage(): Promise<void> {
   try {
-    const dataToSave = JSON.stringify(articleChunks, null, 2);
-    fs.writeFileSync(STORAGE_FILE, dataToSave);
-    console.log(`✅ Saved ${articleChunks.length} chunks to persistent storage (${dataToSave.length} bytes)`);
+    console.log(`💾 Saving ${articleChunks.length} chunks to Netlify Blob Store...`);
     
-    // Verify the file was written correctly
-    if (fs.existsSync(STORAGE_FILE)) {
-      const fileSize = fs.statSync(STORAGE_FILE).size;
-      console.log(`✅ Confirmed storage file exists: ${fileSize} bytes`);
-    }
+    const store = getStore('helpscout');
+    await store.set(STORAGE_KEY, articleChunks);
+    
+    console.log(`✅ Saved ${articleChunks.length} chunks to Netlify Blob Store`);
   } catch (error) {
-    console.error('❌ Error saving chunks to file:', error);
+    console.error('❌ Error saving chunks to Netlify Blob Store:', error);
   }
 }
 
@@ -132,6 +114,9 @@ async function createDemoChunks(): Promise<void> {
     }
     
     console.log(`🎯 Created ${articleChunks.length} demo chunks for production testing`);
+    
+    // Save demo chunks to blob store for persistence
+    await saveChunksToStorage();
   } catch (error) {
     console.error('❌ Error creating demo chunks:', error);
   }
@@ -265,8 +250,8 @@ export async function storeArticle(article: Article): Promise<void> {
   article.chunks = chunks;
   articleStore.set(article.id, article);
   
-  // Save to file for persistence
-  saveChunksToFile();
+  // Save to blob store for persistence
+  await saveChunksToStorage();
   } catch (error) {
     console.error(`Error storing article ${article.id}:`, error);
     throw error;
@@ -292,17 +277,17 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export async function searchArticles(query: string, limit: number = 5): Promise<ArticleChunk[]> {
   console.log(`Search called with query: "${query}"`);
   
-  // Load chunks from file if not in memory
+  // Load chunks from blob store if not in memory
   if (articleChunks.length === 0) {
-    loadChunksFromFile();
+    await loadChunksFromStorage();
   }
   
   console.log(`Total chunks available: ${articleChunks.length}`);
   
-  // If still no chunks after loading from file, create fallback demo chunks
+  // If still no chunks after loading from blob store, create fallback demo chunks
   if (articleChunks.length === 0) {
     console.log('🚀 No chunks found, creating demo chunks for testing...');
-    createDemoChunks();
+    await createDemoChunks();
   }
   
   if (articleChunks.length === 0) {
