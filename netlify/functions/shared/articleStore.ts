@@ -25,12 +25,28 @@ let articleStore: Map<string, Article> = new Map();
 let articleChunks: ArticleChunk[] = [];
 
 // Netlify Blob Store for persistent storage
-import { getStore } from '@netlify/blobs';
+let blobStoreAvailable = true;
+let getStore: any;
+
+try {
+  const blobModule = require('@netlify/blobs');
+  getStore = blobModule.getStore;
+  console.log('✅ Netlify Blobs module loaded successfully');
+} catch (error) {
+  blobStoreAvailable = false;
+  console.error('❌ Netlify Blobs not available:', error.message);
+  console.log('🔄 Falling back to in-memory storage');
+}
 
 const STORAGE_KEY = 'helpscout-articles';
 
 // Load chunks from blob store if available
 async function loadChunksFromStorage(): Promise<void> {
+  if (!blobStoreAvailable) {
+    console.log(`🔄 Blob Store not available, skipping load`);
+    return;
+  }
+  
   try {
     console.log(`🔍 Attempting to load chunks from Netlify Blob Store...`);
     
@@ -56,6 +72,11 @@ async function loadChunksFromStorage(): Promise<void> {
 
 // Save chunks to blob store
 async function saveChunksToStorage(): Promise<void> {
+  if (!blobStoreAvailable) {
+    console.log(`🔄 Blob Store not available, skipping save`);
+    return;
+  }
+  
   try {
     console.log(`💾 Saving ${articleChunks.length} chunks to Netlify Blob Store...`);
     
