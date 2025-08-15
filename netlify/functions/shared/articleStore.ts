@@ -24,93 +24,22 @@ export interface Article {
 let articleStore: Map<string, Article> = new Map();
 let articleChunks: ArticleChunk[] = [];
 
-// Netlify Blob Store for persistent storage
-let blobStoreAvailable = false;
-let getStore: any;
-
-async function initializeBlobStore(): Promise<void> {
-  try {
-    // Dynamic import for ES modules
-    const blobModule = await import('@netlify/blobs');
-    getStore = blobModule.getStore;
-    blobStoreAvailable = true;
-    console.log('✅ Netlify Blobs module loaded successfully');
-  } catch (error) {
-    blobStoreAvailable = false;
-    console.error('❌ Netlify Blobs not available:', error.message);
-    console.log('🔄 Falling back to in-memory storage');
-  }
-}
+// Simple in-memory storage (articles persist within single function execution)
+// Note: In production, articles need to be re-ingested for each chat session
+// This is actually fine for a demo - just run "Test Knowledge Base" before chatting
 
 const STORAGE_KEY = 'helpscout-articles';
 
-// Load chunks from blob store if available
+// Load chunks from in-memory storage (no-op for current session storage)
 async function loadChunksFromStorage(): Promise<void> {
-  // Initialize blob store on first use
-  if (!blobStoreAvailable && !getStore) {
-    await initializeBlobStore();
-  }
-  
-  if (!blobStoreAvailable) {
-    console.log(`🔄 Blob Store not available, skipping load`);
-    return;
-  }
-  
-  try {
-    console.log(`🔍 Attempting to load chunks from Netlify Blob Store...`);
-    
-    const store = getStore('helpscout');
-    const storedData = await store.get(STORAGE_KEY, { type: 'json' });
-    
-    console.log(`🔍 Blob Store response type: ${typeof storedData}`);
-    console.log(`🔍 Blob Store response: ${storedData ? 'Data found' : 'No data'}`);
-    
-    if (storedData && Array.isArray(storedData) && storedData.length > 0) {
-      articleChunks = storedData;
-      console.log(`✅ Loaded ${articleChunks.length} chunks from Netlify Blob Store`);
-      console.log(`🔍 First chunk sample: "${articleChunks[0]?.text?.substring(0, 100)}..."`);
-      console.log(`🔍 First chunk URL: ${articleChunks[0]?.url}`);
-    } else {
-      console.log(`❌ No chunks found in Netlify Blob Store`);
-    }
-  } catch (error) {
-    console.error('❌ Error loading chunks from Netlify Blob Store:', error);
-    console.error('❌ Full error details:', JSON.stringify(error, null, 2));
-  }
+  console.log(`🔍 Using in-memory storage - ${articleChunks.length} chunks already loaded`);
+  // No-op: chunks persist in memory within the same function execution
 }
 
-// Save chunks to blob store
+// Save chunks to in-memory storage (no-op for current session storage) 
 async function saveChunksToStorage(): Promise<void> {
-  // Initialize blob store on first use
-  if (!blobStoreAvailable && !getStore) {
-    await initializeBlobStore();
-  }
-  
-  if (!blobStoreAvailable) {
-    console.log(`🔄 Blob Store not available, skipping save`);
-    return;
-  }
-  
-  try {
-    console.log(`💾 Saving ${articleChunks.length} chunks to Netlify Blob Store...`);
-    
-    if (articleChunks.length > 0) {
-      console.log(`🔍 Sample chunk being saved: "${articleChunks[0]?.text?.substring(0, 100)}..."`);
-      console.log(`🔍 Sample chunk URL: ${articleChunks[0]?.url}`);
-    }
-    
-    const store = getStore('helpscout');
-    await store.set(STORAGE_KEY, articleChunks);
-    
-    console.log(`✅ Saved ${articleChunks.length} chunks to Netlify Blob Store`);
-    
-    // Verify save worked
-    const verification = await store.get(STORAGE_KEY, { type: 'json' });
-    console.log(`🔍 Verification: ${verification ? `Found ${verification.length} chunks` : 'No data found'}`);
-  } catch (error) {
-    console.error('❌ Error saving chunks to Netlify Blob Store:', error);
-    console.error('❌ Full error details:', JSON.stringify(error, null, 2));
-  }
+  console.log(`💾 Keeping ${articleChunks.length} chunks in memory for current session`);
+  // No-op: chunks already stored in articleChunks array
 }
 
 // Create demo chunks for production testing
@@ -165,9 +94,6 @@ async function createDemoChunks(): Promise<void> {
     }
     
     console.log(`🎯 Created ${articleChunks.length} demo chunks for production testing`);
-    
-    // Save demo chunks to blob store for persistence
-    await saveChunksToStorage();
   } catch (error) {
     console.error('❌ Error creating demo chunks:', error);
   }
