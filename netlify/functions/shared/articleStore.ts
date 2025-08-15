@@ -42,6 +42,127 @@ async function saveChunksToStorage(): Promise<void> {
   // No-op: chunks already stored in articleChunks array
 }
 
+// Fetch real articles on-demand when no chunks are available
+async function fetchRealArticlesOnDemand(): Promise<void> {
+  try {
+    console.log('🔄 Fetching real HelpScout articles on-demand...');
+    
+    const helpscoutApiKey = process.env.HELPSCOUT_API_KEY;
+    if (!helpscoutApiKey) {
+      console.error('❌ HelpScout API key not available');
+      await createDemoChunks();
+      return;
+    }
+
+    // Import axios dynamically (since we're in a serverless function)
+    const axios = await import('axios');
+    
+    // Get a few real articles
+    const response = await axios.default.get('https://docsapi.helpscout.net/v1/collections', {
+      auth: {
+        username: helpscoutApiKey,
+        password: 'X',
+      },
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const collections = response.data;
+    let collectionsArray;
+    
+    if (collections.collections && collections.collections.items) {
+      collectionsArray = collections.collections.items;
+    } else if (collections.items) {
+      collectionsArray = collections.items;
+    } else if (Array.isArray(collections)) {
+      collectionsArray = collections;
+    } else {
+      console.error('❌ Unexpected collections structure');
+      await createDemoChunks();
+      return;
+    }
+
+    let articlesProcessed = 0;
+    const MAX_ARTICLES = 3; // Just get a few for chat
+
+    for (const collection of collectionsArray.slice(0, 3)) {
+      if (articlesProcessed >= MAX_ARTICLES) break;
+      
+      try {
+        const articlesResponse = await axios.default.get(
+          `https://docsapi.helpscout.net/v1/collections/${collection.id}/articles`,
+          {
+            auth: {
+              username: helpscoutApiKey,
+              password: 'X',
+            },
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        let articles = [];
+        if (articlesResponse.data.articles && articlesResponse.data.articles.items) {
+          articles = articlesResponse.data.articles.items;
+        } else if (articlesResponse.data.items) {
+          articles = articlesResponse.data.items;
+        }
+
+        for (const article of articles.slice(0, 2)) {
+          if (articlesProcessed >= MAX_ARTICLES) break;
+          
+          try {
+            const articleResponse = await axios.default.get(
+              `https://docsapi.helpscout.net/v1/articles/${article.id}`,
+              {
+                auth: {
+                  username: helpscoutApiKey,
+                  password: 'X',
+                },
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+
+            const fullArticle = articleResponse.data.article;
+            
+            if (!fullArticle.text || fullArticle.text.trim().length === 0) {
+              continue;
+            }
+            
+            const articleToStore = {
+              id: fullArticle.id,
+              name: fullArticle.name,
+              text: fullArticle.text,
+              url: fullArticle.publicUrl || '',
+              lastModified: fullArticle.updatedAt,
+              chunks: [],
+            };
+
+            await storeArticle(articleToStore);
+            articlesProcessed++;
+            
+            console.log(`✅ On-demand processed: ${fullArticle.name}`);
+          } catch (error) {
+            console.error(`Error processing article ${article.id}:`, error.message);
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing collection ${collection.id}:`, error.message);
+      }
+    }
+    
+    console.log(`✅ On-demand fetched ${articlesProcessed} real articles`);
+  } catch (error) {
+    console.error('❌ Error in on-demand fetch:', error.message);
+    // Fallback to demo chunks if real fetch fails
+    await createDemoChunks();
+  }
+}
+
 // Create demo chunks for production testing
 async function createDemoChunks(): Promise<void> {
   try {
@@ -62,7 +183,7 @@ async function createDemoChunks(): Promise<void> {
         articleId: 'demo_ios',
         articleName: 'Testing Your iOS App',
         text: 'When your app is ready for testing, you can simply download a test version of your app to your iOS device by following these steps: 1. Download TestFlight by visiting this link on your iOS phone. 2. From your phone, click on the link you were provided in your test build email, which should look something like this: https://testflight.apple.com/join/2Z2padoO. This link should open TestFlight and open a window with a button that says "Accept." Sometimes on first try this doesn\'t pop open the window with the accept button. If it doesn\'t, just click on the link again. 3. Once accepted, click on "Install". The app should begin installing and should be ready to test within a few minutes. 4. You can share your link and these instructions with anyone you would like to test your app on iOS.',
-        url: 'https://support.aloompa.com/article/590-testing-your-ios-app',
+        url: 'https://support.aloompa.com/article/339-testing-your-app',
         lastModified: new Date().toISOString(),
         chunkIndex: 0,
       },
@@ -261,10 +382,10 @@ export async function searchArticles(query: string, limit: number = 5): Promise<
   
   console.log(`Total chunks available: ${articleChunks.length}`);
   
-  // If still no chunks after loading from blob store, create fallback demo chunks
+  // If still no chunks after loading from blob store, fetch real articles on-demand
   if (articleChunks.length === 0) {
-    console.log('🚀 No chunks found, creating demo chunks for testing...');
-    await createDemoChunks();
+    console.log('🚀 No chunks found, fetching real articles on-demand...');
+    await fetchRealArticlesOnDemand();
   }
   
   if (articleChunks.length === 0) {
