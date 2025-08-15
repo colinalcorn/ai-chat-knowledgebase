@@ -25,23 +25,32 @@ let articleStore: Map<string, Article> = new Map();
 let articleChunks: ArticleChunk[] = [];
 
 // Netlify Blob Store for persistent storage
-let blobStoreAvailable = true;
+let blobStoreAvailable = false;
 let getStore: any;
 
-try {
-  const blobModule = require('@netlify/blobs');
-  getStore = blobModule.getStore;
-  console.log('✅ Netlify Blobs module loaded successfully');
-} catch (error) {
-  blobStoreAvailable = false;
-  console.error('❌ Netlify Blobs not available:', error.message);
-  console.log('🔄 Falling back to in-memory storage');
+async function initializeBlobStore(): Promise<void> {
+  try {
+    // Dynamic import for ES modules
+    const blobModule = await import('@netlify/blobs');
+    getStore = blobModule.getStore;
+    blobStoreAvailable = true;
+    console.log('✅ Netlify Blobs module loaded successfully');
+  } catch (error) {
+    blobStoreAvailable = false;
+    console.error('❌ Netlify Blobs not available:', error.message);
+    console.log('🔄 Falling back to in-memory storage');
+  }
 }
 
 const STORAGE_KEY = 'helpscout-articles';
 
 // Load chunks from blob store if available
 async function loadChunksFromStorage(): Promise<void> {
+  // Initialize blob store on first use
+  if (!blobStoreAvailable && !getStore) {
+    await initializeBlobStore();
+  }
+  
   if (!blobStoreAvailable) {
     console.log(`🔄 Blob Store not available, skipping load`);
     return;
@@ -72,6 +81,11 @@ async function loadChunksFromStorage(): Promise<void> {
 
 // Save chunks to blob store
 async function saveChunksToStorage(): Promise<void> {
+  // Initialize blob store on first use
+  if (!blobStoreAvailable && !getStore) {
+    await initializeBlobStore();
+  }
+  
   if (!blobStoreAvailable) {
     console.log(`🔄 Blob Store not available, skipping save`);
     return;
