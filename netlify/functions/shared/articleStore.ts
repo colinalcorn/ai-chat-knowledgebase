@@ -37,14 +37,20 @@ async function loadChunksFromStorage(): Promise<void> {
     const store = getStore('helpscout');
     const storedData = await store.get(STORAGE_KEY, { type: 'json' });
     
+    console.log(`🔍 Blob Store response type: ${typeof storedData}`);
+    console.log(`🔍 Blob Store response: ${storedData ? 'Data found' : 'No data'}`);
+    
     if (storedData && Array.isArray(storedData) && storedData.length > 0) {
       articleChunks = storedData;
       console.log(`✅ Loaded ${articleChunks.length} chunks from Netlify Blob Store`);
+      console.log(`🔍 First chunk sample: "${articleChunks[0]?.text?.substring(0, 100)}..."`);
+      console.log(`🔍 First chunk URL: ${articleChunks[0]?.url}`);
     } else {
       console.log(`❌ No chunks found in Netlify Blob Store`);
     }
   } catch (error) {
     console.error('❌ Error loading chunks from Netlify Blob Store:', error);
+    console.error('❌ Full error details:', JSON.stringify(error, null, 2));
   }
 }
 
@@ -53,12 +59,22 @@ async function saveChunksToStorage(): Promise<void> {
   try {
     console.log(`💾 Saving ${articleChunks.length} chunks to Netlify Blob Store...`);
     
+    if (articleChunks.length > 0) {
+      console.log(`🔍 Sample chunk being saved: "${articleChunks[0]?.text?.substring(0, 100)}..."`);
+      console.log(`🔍 Sample chunk URL: ${articleChunks[0]?.url}`);
+    }
+    
     const store = getStore('helpscout');
     await store.set(STORAGE_KEY, articleChunks);
     
     console.log(`✅ Saved ${articleChunks.length} chunks to Netlify Blob Store`);
+    
+    // Verify save worked
+    const verification = await store.get(STORAGE_KEY, { type: 'json' });
+    console.log(`🔍 Verification: ${verification ? `Found ${verification.length} chunks` : 'No data found'}`);
   } catch (error) {
     console.error('❌ Error saving chunks to Netlify Blob Store:', error);
+    console.error('❌ Full error details:', JSON.stringify(error, null, 2));
   }
 }
 
